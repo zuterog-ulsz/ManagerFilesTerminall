@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import zipfile
 import shutil
 import subprocess
 
@@ -40,8 +39,6 @@ def show_final_step(success, logs):
 def run_installation(target_path, version="v2"):
     logs = []
     clear_screen()
-    
-    # СРАЗУ определяем папку, чтобы не было ошибки в логах
     target_dir = os.path.dirname(target_path)
     
     print(f"--- Установка MFT {version} ---")
@@ -51,63 +48,48 @@ def run_installation(target_path, version="v2"):
         return
 
     try:
-        # 1. Поиск исходного файла
-        source_dir = os.path.join("mft_binaries", version)
-        source_file = os.path.join(source_dir, "mft")
-        
+        # Исходный файл
+        source_file = os.path.join("mft_binaries", version, "mft")
         logs.append(f"[DEBUG] Проверка источника: {source_file}")
         if not os.path.exists(source_file):
-            raise FileNotFoundError(f"Файл 'mft' не найден в {source_dir}")
+            raise FileNotFoundError(f"Файл 'mft' не найден в {source_file}")
 
-        # 2. Анимация (для красоты)
+        # Анимация установки
         for i in range(11):
             time.sleep(0.1)
             sys.stdout.write(f"\rУстановка: [{'#'*i}{'.'*(10-i)}] {i*10}%")
             sys.stdout.flush()
         print()
 
-        # 3. Копирование (Универсальный метод)
-        logs.append(f"[DEBUG] Подготовка папки: {target_dir}")
-        
-        # Проверяем, есть ли sudo в системе вообще
-        has_sudo = shutil.which("sudo") is not None
-        logs.append(f"[DEBUG] Наличие sudo: {has_sudo}")
+        # Проверка sudo/root
+        if shutil.which("sudo") is None and os.geteuid() != 0:
+            raise PermissionError("Требуются права root или sudo для установки")
 
-        def run_cmd(cmd):
-            # Если sudo есть, добавляем его, если нет — пускаем как есть
-            final_cmd = f"sudo {cmd}" if has_sudo else cmd
-            return subprocess.run(final_cmd, shell=True, check=True, capture_output=True)
+        # Создание папки
+        subprocess.run(['sudo', 'mkdir', '-p', target_dir], check=True)
+        logs.append(f"[DEBUG] Папка {target_dir} готова")
 
-        try:
-            run_cmd(f"mkdir -p {target_dir}")
-            logs.append(f"[DEBUG] Папка готова")
+        # Копирование и установка прав
+        subprocess.run(['sudo', 'cp', source_file, target_path], check=True)
+        logs.append(f"[DEBUG] Файл скопирован в {target_path}")
+        subprocess.run(['sudo', 'chmod', '+x', target_path], check=True)
+        logs.append("[DEBUG] Права +x установлены")
 
-            run_cmd(f"cp {source_file} {target_path}")
-            logs.append(f"[DEBUG] Файл скопирован")
-
-            run_cmd(f"chmod +x {target_path}")
-            logs.append("[DEBUG] Права +x установлены")
-            
-        except subprocess.CalledProcessError as e:
-            logs.append(f"[ERROR] Ошибка команды: {e.stderr.decode().strip()}")
-            raise
-
-        # 4. Alias
+        # Alias
         if make_alias == 'y':
             bashrc = os.path.expanduser("~/.bashrc")
-            # Проверяем, нет ли уже такого алиаса, чтобы не дублировать
-            with open(bashrc, "r") as f:
-                if f"alias mft=" not in f.read():
-                    with open(bashrc, "a") as fa:
-                        fa.write(f"\nalias mft='sudo {target_path}'\n")
+            with open(bashrc, "r+") as f:
+                lines = f.read()
+                if f"alias mft=" not in lines:
+                    f.write(f"\nalias mft='sudo {target_path}'\n")
                     logs.append("[DEBUG] Alias добавлен")
                 else:
-                    logs.append("[DEBUG] Alias уже существует, пропускаем")
+                    logs.append("[DEBUG] Alias уже существует")
 
         show_final_step(True, logs)
 
     except Exception as e:
-        logs.append(f"[ERROR] Критическая ошибка: {str(e)}")
+        logs.append(f"[ERROR] {str(e)}")
         show_final_step(False, logs)
 
 def recovery_menu(target_path):
@@ -122,8 +104,14 @@ def recovery_menu(target_path):
     if choice == '1':
         path = input(f"Путь для удаления ({target_path}): ") or target_path
         if os.path.exists(path):
-            # subprocess.run(['sudo', 'rm', path])
-            print(f"Файл {path} удален.")
+            try:
+                if os.path.isdir(path):
+                    subprocess.run(['sudo', 'rm', '-rf', path], check=True)
+                else:
+                    subprocess.run(['sudo', 'rm', path], check=True)
+                print(f"Файл/папка {path} удален(а).")
+            except subprocess.CalledProcessError as e:
+                print(f"[ERROR] Не удалось удалить: {e}")
         else:
             print("Файл не найден.")
         input("Нажмите Enter...")
@@ -131,15 +119,13 @@ def recovery_menu(target_path):
     elif choice == '2':
         run_installation(target_path, "v2")
     elif choice == '3':
-        # --- ВЫБОР ДРУГОЙ ВЕРСИИ ИЗ ПАПОК ---
         try:
             base_dir = "mft_binaries"
             if not os.path.exists(base_dir):
                 raise FileNotFoundError(f"Папка {base_dir} не найдена!")
 
-            # Получаем список всех подпапок (v1, v2...)
             versions = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))]
-            versions.sort() # Чтобы v1 была первой
+            versions.sort()
             
             if not versions:
                 print("\n[ОШИБКА] В папке mft_binaries нет подпапок с версиями!")
@@ -168,19 +154,17 @@ def main():
     print(f"   Автор: ZuteroG | zuterog@gmail.com")
     print(f"========================================\n")
 
-    # ШАГ 1: Путь
     path = input(f"Куда установить? (Default: {DEFAULT_PATH}): ") or DEFAULT_PATH
-    
-    # ШАГ 2: Лицензия
-    print("\nЛицензионое Соглашенния")
-    print("1 автор не несеть ответствености за ваши действия с вашими даними с помощюу его утилити")
-    print("2 ви соглашаетес с Лицензияй MIT")
-    print("3 автор не несеть ответствености за ваши модификации форки иваши версии mft")
-    print("4 ви соглашаетес от полного отказа претенезиям к автору по тому или иному делу")
-    print("5 для связи с автором надо писать в почту gmail zuterog@gmail.com")
+
+    # Лицензия
+    print("\nЛицензионое Соглашение")
+    print("1. Автор не несет ответственности за ваши данные")
+    print("2. Вы соглашаетесь с Лицензией MIT")
+    print("3. Автор не несет ответственности за модификации и форки")
+    print("4. Полный отказ претензий к автору")
+    print("5. Для связи с автором: zuterog@gmail.com")
     if input("Согласны? (y/n): ").lower() != 'y': sys.exit()
 
-    # ШАГ 3: Выбор режима
     print("\n1. Установка\n2. Восстановление/Удаление")
     if input("Вариант: ") == '2':
         recovery_menu(path)
