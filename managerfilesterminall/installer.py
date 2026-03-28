@@ -7,7 +7,7 @@ import subprocess
 
 # --- КОНСТАНТЫ ---
 APP_NAME = "MFT (Manager Files Terminal)"
-INST_VERSION = "v1"
+INST_VERSION = "v2"
 DEFAULT_PATH = "/usr/local/bin/mft"
 
 def clear_screen():
@@ -37,7 +37,7 @@ def show_final_step(success, logs):
     else:
         sys.exit()
 
-def run_installation(target_path, version="v1"):
+def run_installation(target_path, version="v2"):
     logs = []
     clear_screen()
     
@@ -129,7 +129,7 @@ def recovery_menu(target_path):
         input("Нажмите Enter...")
         main()
     elif choice == '2':
-        run_installation(target_path, "v1")
+        run_installation(target_path, "v2")
     elif choice == '3':
         # --- ВЫБОР ДРУГОЙ ВЕРСИИ ИЗ ПАПОК ---
         try:
@@ -172,8 +172,12 @@ def main():
     path = input(f"Куда установить? (Default: {DEFAULT_PATH}): ") or DEFAULT_PATH
     
     # ШАГ 2: Лицензия
-    print("\n--- ЛИЦЕНЗИЯ ---")
-    print("Автор не несет ответственности за баги после ваших модификаций.")
+    print("\nЛицензионое Соглашенния")
+    print("1 автор не несеть ответствености за ваши действия с вашими даними с помощюу его утилити")
+    print("2 ви соглашаетес с Лицензияй MIT")
+    print("3 автор не несеть ответствености за ваши модификации форки иваши версии mft")
+    print("4 ви соглашаетес от полного отказа претенезиям к автору по тому или иному делу")
+    print("5 для связи с автором надо писать в почту gmail zuterog@gmail.com")
     if input("Согласны? (y/n): ").lower() != 'y': sys.exit()
 
     # ШАГ 3: Выбор режима
