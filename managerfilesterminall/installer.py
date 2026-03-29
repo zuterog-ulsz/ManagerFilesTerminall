@@ -6,7 +6,7 @@ import subprocess
 
 # --- КОНСТАНТЫ ---
 APP_NAME = "MFT (Manager Files Terminal)"
-INST_VERSION = "v2"
+INST_VERSION = "v3"
 DEFAULT_PATH = "/usr/local/bin/mft"
 
 def clear_screen():
@@ -36,7 +36,7 @@ def show_final_step(success, logs):
     else:
         sys.exit()
 
-def run_installation(target_path, version="v2"):
+def run_installation(target_path, version="v3"):
     logs = []
     clear_screen()
     target_dir = os.path.dirname(target_path)
@@ -117,7 +117,7 @@ def recovery_menu(target_path):
         input("Нажмите Enter...")
         main()
     elif choice == '2':
-        run_installation(target_path, "v2")
+        run_installation(target_path, "v3")
     elif choice == '3':
         try:
             base_dir = "mft_binaries"
